@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field
 from typing import Optional
+from pydantic import BaseModel, Field
 
 
 class LineItem(BaseModel):
@@ -23,9 +23,14 @@ class Invoice(BaseModel):
     purchase_order: Optional[str] = None
 
     subtotal: Optional[float] = None
+
+    # Header-level discount
     discount: Optional[float] = None
+
     tax: Optional[float] = None
     total_amount: Optional[float] = None
     currency: Optional[str] = None
 
-    line_items: list[LineItem] = Field(default_factory=list)
+    line_items: list[LineItem] = Field(
+        default_factory=list
+    )
