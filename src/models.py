@@ -6,7 +6,6 @@ class LineItem(BaseModel):
     description: Optional[str] = None
     quantity: Optional[float] = None
     unit_price: Optional[float] = None
-    discount: Optional[float] = None
     tax: Optional[float] = None
     amount: Optional[float] = None
 
@@ -24,6 +23,7 @@ class Invoice(BaseModel):
     purchase_order: Optional[str] = None
 
     subtotal: Optional[float] = None
+    discount: Optional[float] = None
     tax: Optional[float] = None
     total_amount: Optional[float] = None
     currency: Optional[str] = None

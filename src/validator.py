@@ -5,95 +5,206 @@ def validate_invoice(invoice):
 
     results = []
 
-    # Invoice Number
+    # ==========================================
+    # 1. INVOICE NUMBER
+    # ==========================================
+
     if invoice.invoice_number:
+
         results.append(
-            ("Invoice Number", "PASS", "Invoice number available")
-        )
-    else:
-        results.append(
-            ("Invoice Number", "FAIL", "Invoice number missing")
+            (
+                "Invoice Number",
+                "PASS",
+                "Invoice number is available"
+            )
         )
 
-    # Invoice Date
+    else:
+
+        results.append(
+            (
+                "Invoice Number",
+                "FAILED",
+                "Invoice number is missing"
+            )
+        )
+
+
+    # ==========================================
+    # 2. INVOICE DATE
+    # ==========================================
+
     if invoice.invoice_date:
+
         results.append(
-            ("Invoice Date", "PASS", "Invoice date available")
-        )
-    else:
-        results.append(
-            ("Invoice Date", "REVIEW", "Invoice date missing")
+            (
+                "Invoice Date",
+                "PASS",
+                "Invoice date is available"
+            )
         )
 
-    # Vendor
+    else:
+
+        results.append(
+            (
+                "Invoice Date",
+                "REVIEW",
+                "Invoice date is missing"
+            )
+        )
+
+
+    # ==========================================
+    # 3. VENDOR NAME
+    # ==========================================
+
     if invoice.vendor_name:
+
         results.append(
-            ("Vendor", "PASS", "Vendor identified")
-        )
-    else:
-        results.append(
-            ("Vendor", "FAIL", "Vendor missing")
+            (
+                "Vendor Name",
+                "PASS",
+                "Vendor name is available"
+            )
         )
 
-    # GSTIN validation
+    else:
+
+        results.append(
+            (
+                "Vendor Name",
+                "FAILED",
+                "Vendor name is missing"
+            )
+        )
+
+
+    # ==========================================
+    # 4. VENDOR GSTIN
+    # ==========================================
+
     if invoice.vendor_gstin:
 
-        gst_pattern = (
-            r"^[0-9]{2}[A-Z]{5}[0-9]{4}"
-            r"[A-Z][1-9A-Z]Z[0-9A-Z]$"
+        gstin_pattern = (
+            r"^[0-9]{2}"
+            r"[A-Z]{5}"
+            r"[0-9]{4}"
+            r"[A-Z]"
+            r"[1-9A-Z]"
+            r"Z"
+            r"[0-9A-Z]$"
         )
 
-        if re.match(gst_pattern, invoice.vendor_gstin.upper()):
+        if re.match(
+            gstin_pattern,
+            invoice.vendor_gstin.upper()
+        ):
 
             results.append(
-                ("GSTIN", "PASS", "GSTIN format valid")
+                (
+                    "Vendor GSTIN",
+                    "PASS",
+                    "GSTIN format is valid"
+                )
             )
 
         else:
 
             results.append(
-                ("GSTIN", "REVIEW", "GSTIN format requires review")
+                (
+                    "Vendor GSTIN",
+                    "REVIEW",
+                    "GSTIN format requires review"
+                )
             )
 
     else:
 
         results.append(
-            ("GSTIN", "REVIEW", "GSTIN not detected")
+            (
+                "Vendor GSTIN",
+                "REVIEW",
+                "Vendor GSTIN is not available"
+            )
         )
 
-    # PO Number
+
+    # ==========================================
+    # 5. PURCHASE ORDER
+    # ==========================================
+
     if invoice.purchase_order:
 
         results.append(
-            ("Purchase Order", "PASS", "PO number available")
+            (
+                "Purchase Order",
+                "PASS",
+                "Purchase order is available"
+            )
         )
 
     else:
 
         results.append(
-            ("Purchase Order", "REVIEW", "PO number not detected")
+            (
+                "Purchase Order",
+                "REVIEW",
+                "Purchase order is not available"
+            )
         )
 
-    # Amount validation
+
+    # ==========================================
+    # 6. AMOUNT CALCULATION
+    #
+    # Subtotal - Discount + Tax = Total
+    # ==========================================
+
     if (
         invoice.subtotal is not None
         and invoice.tax is not None
         and invoice.total_amount is not None
     ):
 
-        expected_total = invoice.subtotal + invoice.tax
-
-        difference = abs(
-            expected_total - invoice.total_amount
+        subtotal = float(
+            invoice.subtotal or 0
         )
 
+        discount = float(
+            invoice.discount or 0
+        )
+
+        tax = float(
+            invoice.tax or 0
+        )
+
+        total = float(
+            invoice.total_amount or 0
+        )
+
+        expected_total = (
+            subtotal
+            - discount
+            + tax
+        )
+
+        difference = abs(
+            expected_total - total
+        )
+
+        # ₹1 / currency-unit tolerance
         if difference <= 1:
 
             results.append(
                 (
                     "Amount Calculation",
                     "PASS",
-                    "Subtotal + Tax matches Total"
+                    (
+                        f"Calculated total "
+                        f"{expected_total:.2f} matches "
+                        f"invoice total {total:.2f}"
+                    )
                 )
             )
 
@@ -102,8 +213,14 @@ def validate_invoice(invoice):
             results.append(
                 (
                     "Amount Calculation",
-                    "FAIL",
-                    f"Amount mismatch: difference {difference:.2f}"
+                    "FAILED",
+                    (
+                        f"Calculated total is "
+                        f"{expected_total:.2f}, "
+                        f"but invoice total is "
+                        f"{total:.2f}. "
+                        f"Difference: {difference:.2f}"
+                    )
                 )
             )
 
@@ -113,20 +230,13 @@ def validate_invoice(invoice):
             (
                 "Amount Calculation",
                 "REVIEW",
-                "Unable to validate invoice total"
+                "Insufficient amount information for validation"
             )
         )
 
-    # Determine overall status
-    statuses = [result[1] for result in results]
 
-    if "FAIL" in statuses:
-        overall_status = "FAILED"
+    # ==========================================
+    # RETURN
+    # ==========================================
 
-    elif "REVIEW" in statuses:
-        overall_status = "REVIEW"
-
-    else:
-        overall_status = "PASS"
-
-    return overall_status, results
+    return results

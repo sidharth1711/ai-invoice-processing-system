@@ -22,8 +22,9 @@ Important rules:
 7. Determine the currency from the invoice.
 8. GSTIN must be copied exactly as shown.
 9. invoice_date should preferably use YYYY-MM-DD format.
-10. For each line item, extract any discount shown.
-11. If no line-item discount is shown, return null for discount.
+10. Extract the invoice-level discount into the discount field.
+11. If no invoice-level discount is shown, return null.
+12. Do not include invoice-level discount in individual line items.
 """
 
 
