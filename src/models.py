@@ -6,6 +6,7 @@ class LineItem(BaseModel):
     description: Optional[str] = None
     quantity: Optional[float] = None
     unit_price: Optional[float] = None
+    discount: Optional[float] = None
     tax: Optional[float] = None
     amount: Optional[float] = None
 

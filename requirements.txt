@@ -3,3 +3,4 @@ openai
 pydantic
 pandas
 python-dotenv
+openpyxl

@@ -2,6 +2,7 @@ import os
 
 import pandas as pd
 import streamlit as st
+from io import BytesIO
 from dotenv import load_dotenv
 
 from src.extractor import extract_invoice
@@ -243,12 +244,12 @@ if st.session_state.invoice:
         )
 
     else:
-
         line_items_df = pd.DataFrame(
             columns=[
                 "description",
                 "quantity",
                 "unit_price",
+                "discount",
                 "tax",
                 "amount"
             ]
@@ -275,6 +276,7 @@ if st.session_state.invoice:
                 description=row.get("description"),
                 quantity=row.get("quantity"),
                 unit_price=row.get("unit_price"),
+                discount=row.get("discount"),
                 tax=row.get("tax"),
                 amount=row.get("amount")
             )
@@ -408,103 +410,154 @@ if st.session_state.invoice:
 
 
     # ==================================
-    # EXPORT
+# EXPORT
+# ==================================
+
+if st.session_state.decision == "APPROVED":
+
+    st.divider()
+    st.header("Export")
+
+    # ==================================
+    # 1. INVOICE HEADER
     # ==================================
 
-    if st.session_state.decision == "APPROVED":
+    header_data = {
+        "Invoice Number": reviewed_invoice.invoice_number,
+        "Invoice Date": reviewed_invoice.invoice_date,
+        "Vendor Name": reviewed_invoice.vendor_name,
+        "Vendor GSTIN": reviewed_invoice.vendor_gstin,
+        "Customer Name": reviewed_invoice.customer_name,
+        "Customer GSTIN": reviewed_invoice.customer_gstin,
+        "Purchase Order": reviewed_invoice.purchase_order,
+        "Subtotal": reviewed_invoice.subtotal,
+        "Tax": reviewed_invoice.tax,
+        "Total Amount": reviewed_invoice.total_amount,
+        "Currency": reviewed_invoice.currency,
+        "Validation Status": overall_status,
+        "Approval Status": "APPROVED"
+    }
 
-        st.divider()
-
-        st.header("Export")
-
-        export_data = {
-            "invoice_number":
-                reviewed_invoice.invoice_number,
-
-            "invoice_date":
-                reviewed_invoice.invoice_date,
-
-            "vendor_name":
-                reviewed_invoice.vendor_name,
-
-            "vendor_gstin":
-                reviewed_invoice.vendor_gstin,
-
-            "customer_name":
-                reviewed_invoice.customer_name,
-
-            "customer_gstin":
-                reviewed_invoice.customer_gstin,
-
-            "purchase_order":
-                reviewed_invoice.purchase_order,
-
-            "subtotal":
-                reviewed_invoice.subtotal,
-
-            "tax":
-                reviewed_invoice.tax,
-
-            "total_amount":
-                reviewed_invoice.total_amount,
-
-            "currency":
-                reviewed_invoice.currency,
-
-            "validation_status":
-                overall_status,
-
-            "approval_status":
-                "APPROVED"
-        }
+    header_df = pd.DataFrame([header_data])
 
 
-        export_df = pd.DataFrame(
-            [export_data]
+    # ==================================
+    # 2. LINE ITEMS
+    # ==================================
+
+    if reviewed_invoice.line_items:
+
+        lines_df = pd.DataFrame(
+            [
+                item.model_dump()
+                for item in reviewed_invoice.line_items
+            ]
+        )
+
+    else:
+
+        lines_df = pd.DataFrame(
+            columns=[
+                "description",
+                "quantity",
+                "unit_price",
+                "discount",
+                "tax",
+                "amount"
+            ]
         )
 
 
-        csv_data = export_df.to_csv(
+    # ==================================
+    # 3. VALIDATION RESULTS
+    # ==================================
+
+    validation_export_df = pd.DataFrame(
+        validation_results,
+        columns=[
+            "Check",
+            "Status",
+            "Details"
+        ]
+    )
+
+
+    # ==================================
+    # CREATE EXCEL FILE
+    # ==================================
+
+    excel_buffer = BytesIO()
+
+    with pd.ExcelWriter(
+        excel_buffer,
+        engine="openpyxl"
+    ) as writer:
+
+        # Sheet 1
+        header_df.to_excel(
+            writer,
+            sheet_name="Invoice Header",
             index=False
-        ).encode("utf-8")
-
-
-        st.download_button(
-            "⬇ Download Invoice CSV",
-            data=csv_data,
-            file_name="approved_invoice.csv",
-            mime="text/csv",
-            use_container_width=True
         )
 
+        # Sheet 2
+        lines_df.to_excel(
+            writer,
+            sheet_name="Line Items",
+            index=False
+        )
 
-        # ----------------------------------
-        # Line Item Export
-        # ----------------------------------
+        # Sheet 3
+        validation_export_df.to_excel(
+            writer,
+            sheet_name="Validation Results",
+            index=False
+        )
 
-        if reviewed_invoice.line_items:
-
-            lines_df = pd.DataFrame(
-                [
-                    item.model_dump()
-                    for item
-                    in reviewed_invoice.line_items
-                ]
-            )
-
-            lines_csv = lines_df.to_csv(
-                index=False
-            ).encode("utf-8")
+    excel_buffer.seek(0)
 
 
-            st.download_button(
-                "⬇ Download Line Items CSV",
-                data=lines_csv,
-                file_name="invoice_line_items.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
+    # ==================================
+    # FILE NAME
+    # ==================================
 
+    invoice_number = (
+        reviewed_invoice.invoice_number
+        or "invoice"
+    )
+
+    # Remove characters that may cause
+    # problems in filenames
+    safe_invoice_number = "".join(
+        char
+        for char in invoice_number
+        if char.isalnum() or char in ("-", "_")
+    )
+
+    file_name = (
+        f"{safe_invoice_number}_processed.xlsx"
+    )
+
+
+    # ==================================
+    # DOWNLOAD BUTTON
+    # ==================================
+
+    st.download_button(
+        label="⬇ Download Complete Invoice",
+        data=excel_buffer.getvalue(),
+        file_name=file_name,
+        mime=(
+            "application/vnd.openxmlformats-officedocument."
+            "spreadsheetml.sheet"
+        ),
+        use_container_width=True
+    )
+
+    st.caption(
+        "Excel workbook includes Invoice Header, "
+        "Line Items and Validation Results."
+    )
 
 # ----------------------------------
 # Footer
@@ -515,4 +568,4 @@ st.divider()
 st.caption(
     "AI Invoice Processing & Validation System • "
     "Built with Python, OpenAI, Pydantic and Streamlit"
-)
+) 
